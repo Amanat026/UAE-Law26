@@ -1,0 +1,204 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, Bot, User, Key, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
+import { sendChatMessage } from './ai/client';
+
+export default function App() {
+  const [messages, setMessages] = useState([
+    {
+      role: 'model',
+      content: 'Hello! I am your UAE Law AI Assistant. How can I help you understand UAE regulations, labor laws, or legal procedures today?'
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('GEMINI_API_KEY');
+    if (!savedKey) {
+      setShowKeyModal(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const handleSaveKey = (e) => {
+    e.preventDefault();
+    if (apiKeyInput.trim()) {
+      localStorage.setItem('GEMINI_API_KEY', apiKeyInput.trim());
+      setShowKeyModal(false);
+      setApiKeyInput('');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    const updatedMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(updatedMessages);
+    setLoading(true);
+
+    try {
+      const aiResponse = await sendChatMessage(updatedMessages);
+      setMessages([...updatedMessages, { role: 'model', content: aiResponse }]);
+    } catch (error) {
+      setMessages([
+        ...updatedMessages,
+        { role: 'model', content: '⚠️ Error: Please ensure your GEMINI_API_KEY is configured properly in Settings or Environment.' }
+      ]);
+      if (error.message.includes('API_KEY')) {
+        setShowKeyModal(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearChat = () => {
+    setMessages([
+      {
+        role: 'model',
+        content: 'Chat cleared. How else can I assist you with UAE laws?'
+      }
+    ]);
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+      <header className="flex items-center justify-between px-6 py-4 bg-gray-900 border-b border-gray-800 shadow-md">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
+            <ShieldAlert className="w-6 h-6 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-wide flex items-center gap-2">
+              UAE Law AI Assistant <Sparkles className="w-4 h-4 text-amber-400" />
+            </h1>
+            <p className="text-xs text-gray-400">Your intelligent legal guidance companion</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={clearChat}
+            className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition"
+            title="Clear Chat"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setShowKeyModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-sm font-medium rounded-lg border border-gray-700 transition"
+          >
+            <Key className="w-4 h-4 text-amber-400" />
+            <span>API Key</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 max-w-4xl w-full mx-auto">
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+              msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-amber-500 text-gray-950 font-bold'
+            }`}>
+              {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+            </div>
+            <div className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+              msg.role === 'user'
+                ? 'bg-indigo-600 text-white rounded-tr-none'
+                : 'bg-gray-900 border border-gray-800 text-gray-200 rounded-tl-none whitespace-pre-wrap'
+            }`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-500 text-gray-950 flex items-center justify-center shrink-0 font-bold">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-gray-400 flex items-center gap-2">
+              <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></span>
+              <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+              <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+              <span className="ml-2">Analyzing UAE regulations...</span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="bg-gray-900 border-t border-gray-800 p-4">
+        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about UAE labor law, commercial regulations, etc..."
+            className="flex-1 bg-gray-950 border border-gray-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl px-4 py-3 text-sm text-gray-100 outline-none transition"
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-gray-950 font-semibold px-5 py-3 rounded-xl flex items-center justify-center transition shrink-0"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+      </div>
+
+      {showKeyModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                <Key className="w-6 h-6 text-amber-400" />
+              </div>
+              <h2 className="text-lg font-bold">Enter Gemini API Key</h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              Your API key is securely stored in your browser's local storage and is used solely to communicate with the Gemini API for legal assistant queries.
+            </p>
+            <form onSubmit={handleSaveKey} className="space-y-4">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full bg-gray-950 border border-gray-800 focus:border-amber-500 rounded-xl px-4 py-3 text-sm text-gray-100 outline-none"
+                required
+              />
+              <div className="flex justify-end gap-2">
+                {localStorage.getItem('GEMINI_API_KEY') && (
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyModal(false)}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm font-medium rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-semibold rounded-xl transition"
+                >
+                  Save Key
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
